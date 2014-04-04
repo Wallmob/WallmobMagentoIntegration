@@ -1,0 +1,15 @@
+{
+    "name": "rubic/wallmob",
+    "type": "magento-module",
+    "license":"Apache-2.0",
+    "description":"Integration between Wallmob and Magento.",
+    "authors":[
+        {
+            "name":"Daniel Sloof",
+            "email":"daniel@rubic.nl"
+        }
+    ],
+    "require": {
+        "magento-hackathon/magento-composer-installer": "*"
+    }
+}
