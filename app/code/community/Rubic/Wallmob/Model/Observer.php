@@ -23,6 +23,7 @@ class Rubic_Wallmob_Model_Observer
      */
     const WALLMOB_TRANSACTION_TYPE  = 'WM_TRANSACTION_TYPE_CARD_EXTERNAL';
     const WALLMOB_TRANSACTION_STATE = 'WM_TRANSACTION_STATE_CAPTURED';
+    const WALLMOB_USER_NAME         = 'MAGENTO';
 
     /**
      * Configuration constants.
@@ -40,10 +41,11 @@ class Rubic_Wallmob_Model_Observer
     protected function _getBaseOrder($order, $shop, $id)
     {
         $data = array(
-            'id'        => $id,
-            'user_name' => $order->getCustomerName(),
-            'shop_name' => Mage::app()->getStore()->getName(),
-            'timestamp' => time()
+            'id'          => $id,
+            'user_name'   => self::WALLMOB_USER_NAME,
+            'customer_id' => $order->getCustomerName(),
+            'shop_name'   => Mage::app()->getStore()->getName(),
+            'timestamp'   => time()
         );
         if (Mage::getStoreConfig(self::XML_PATH_SEND_EMAIL)) {
             $data['email'] = $order->getCustomerEmail();
@@ -51,10 +53,8 @@ class Rubic_Wallmob_Model_Observer
         if ($shop) {
             $data['shop_id'] = $shop['id'];
         }
-        if ($order->getCustomerId()) {
-            $data['customer_id'] = $order->getCustomerId();
-        }
-        if ((bool)$order->getDiscountAmount()) {
+
+        if ($order->getDiscountAmount() > 0) {
             $data['discounts'] = array(array(
                 'amount'      => -($order->getDiscountAmount() * 100),
                 'description' => $order->getDiscountDescription()
@@ -177,6 +177,7 @@ class Rubic_Wallmob_Model_Observer
             $data['transactions'][] = $this->_getTransaction($order, $orderId);
 
             // Attempt to post it.
+            // $helper->logMessage(sprintf('Sending order: %s', print_r($data, true)));
             $return = $api->postOrder($data);
             $helper->logMessage(sprintf('Succesfully posted order: %s', $return['id']));
         } catch (Exception $e) {
