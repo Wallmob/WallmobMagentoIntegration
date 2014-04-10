@@ -34,7 +34,8 @@ class Rubic_Wallmob_Model_Processor_Stock
         // Make stock data digestible.
         $stockUpdates = array();
         foreach ($data as $stock) {
-            $stockUpdates[$stock['product_id']] = $stock['quantity'];
+            if (isset($stock['product_variant_id'])) $stockUpdates[$stock['product_variant_id']] = $stock['quantity'];
+            if (isset($stock['product_id']))         $stockUpdates[$stock['product_id']]         = $stock['quantity'];
         }
 
         // Grab all products that match stock data.
