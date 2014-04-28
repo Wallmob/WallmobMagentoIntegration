@@ -1,5 +1,5 @@
 {
-    "name": "rubic/wallmob",
+    "name": "wallmob/wallmob",
     "type": "magento-module",
     "license":"Apache-2.0",
     "description":"Integration between Wallmob and Magento.",

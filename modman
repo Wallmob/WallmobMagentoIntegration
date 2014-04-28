@@ -1,2 +1,2 @@
-app/code/community/Rubic/Wallmob    app/code/community/Rubic/Wallmob
-app/etc/modules/Rubic_Wallmob.xml   app/etc/modules/Rubic_Wallmob.xml
+app/code/community/Wallmob/Wallmob  app/code/community/Wallmob/Wallmob
+app/etc/modules/Wallmob_Wallmob.xml app/etc/modules/Wallmob_Wallmob.xml
