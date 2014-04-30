@@ -21,6 +21,111 @@ class Wallmob_Wallmob_Model_Processor_Stock
 {
 
     /**
+     * Determines if any of the bundle's variants is in stock.
+     *
+     * @param Mage_Catalog_Model_Product $productIds
+     * @return boolean
+     */
+    protected function _anyProductInStock($product)
+    {
+        // Get all variants from this bundle.
+        $productIds = $product->getTypeInstance()->getSelectionsCollection(
+            $product->getTypeInstance()->getOptionsCollection($product)->getAllIds(), $product
+        )->getColumnValues('product_id');
+
+        // Then if any of them have stock, the bundle is in stock too.
+        $stockItemCollection = Mage::getModel('cataloginventory/stock_item')->getCollection()
+            ->addProductsFilter($productIds);
+        foreach ($stockItemCollection as $stockItem) {
+            if ((int)$stockItem->getQty() > 0) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Updates stock for the parents of specified variants.
+     *
+     * @param array $stockData
+     * @return Wallmob_Wallmob_Model_Processor_Stock
+     */
+    protected function _updateBundleStock($stockData)
+    {
+        // Grab all variant product IDs.
+        $variantIds = $this->_getProductCollectionFromWallmobIds(array_keys($stockData))
+            ->getColumnValues('entity_id');
+
+        // Then use them to get our parent products.
+        $bundleCollection = Mage::getModel('catalog/product')->getCollection()
+            ->addAttributeToSelect('*')
+            ->addFieldToFilter('entity_id', array('in' =>
+                array_unique(Mage::getResourceSingleton('bundle/selection')->getParentIdsByChild($variantIds))
+            ));
+
+        // If we're salable, we're in stock.
+        $this->_getHelper()->logMessage(sprintf('Updating %d bundle stock status.', $bundleCollection->count()));
+        foreach ($bundleCollection as $bundle) {
+            $this->_updateStock($bundle->getId(), (int)$this->_anyProductInStock($bundle));
+        }
+        return $this;
+    }
+
+    /**
+     * Updates normal product stock.
+     *
+     * @param array $stockData
+     * @return Wallmob_Wallmob_Model_Processor_Stock
+     */
+    protected function _updateProductStock($stockData)
+    {
+        $productCollection = $this->_getProductCollectionFromWallmobIds(array_keys($stockData));
+        $this->_getHelper()->logMessage(sprintf('Found %d products that can be updated.', $productCollection->count()));
+        foreach ($productCollection as $_product) {
+            $productId = $_product->getData(Wallmob_Wallmob_Model_Processor_Product::ID_ATTRIBUTE_CODE);
+            if (isset($stockData[$productId])) {
+                $this->_updateStock($_product->getId(), $stockData[$productId]);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * Gets a Magento product collection from wallmob product IDs.
+     *
+     * @param array $wallmobIds
+     * @return Mage_Catalog_Model_Resource_Collection
+     */
+    protected function _getProductCollectionFromWallmobIds($wallmobIds)
+    {
+        return Mage::getModel('catalog/product')->getCollection()
+            ->addAttributeToSelect('*')
+            ->addFieldToFilter(Wallmob_Wallmob_Model_Processor_Product::ID_ATTRIBUTE_CODE, array(
+                'in' => $wallmobIds
+            ));
+    }
+
+    /**
+     * Updates stock for a specified product ID.
+     *
+     * @param int $productId
+     * @param int $qty
+     * @return Wallmob_Wallmob_Model_Processor_Stock
+     */
+    protected function _updateStock($productId, $qty)
+    {
+        $product = Mage::getModel('catalog/product')->load($productId);
+        if ($product->getId()) {
+            $this->_getHelper()->logMessage(sprintf('Updating inventory: %s -> %s', $product->getName(), $qty));
+            $product->setStockData(array(
+                'is_in_stock'  => $qty > 0,
+                'manage_stock' => 1,
+                'qty'          => $qty
+            ));
+            $product->save();
+        }
+        return $this;
+    }
+
+    /**
      * Import stock data.
      *
      * @param array $data
@@ -28,41 +133,26 @@ class Wallmob_Wallmob_Model_Processor_Stock
      */
     public function importData($data)
     {
-        $helper = $this->_getHelper();
-        $helper->logMessage(sprintf('Updating stock for %d products.', count($data)));
+        $this->_getHelper()->logMessage(sprintf('Updating stock for %d products.', count($data)));
 
         // Make stock data digestible.
-        $stockUpdates = array();
+        $stockUpdates   = array();
+        $variantUpdates = array();
         foreach ($data as $stock) {
-            if (isset($stock['product_variant_id'])) $stockUpdates[$stock['product_variant_id']] = $stock['quantity'];
-            if (isset($stock['product_id']))         $stockUpdates[$stock['product_id']]         = $stock['quantity'];
-        }
-
-        // Grab all products that match stock data.
-        $productCollection = Mage::getModel('catalog/product')->getCollection()
-            ->addAttributeToSelect('*')
-            ->addFieldToFilter(Wallmob_Wallmob_Model_Processor_Product::ID_ATTRIBUTE_CODE, array(
-                'in' => array_keys($stockUpdates)
-            ));
-        $helper->logMessage(sprintf('Found %d products that can be updated.', $productCollection->count()));
-
-        // Update the products.
-        foreach ($productCollection as $product) {
-            $productId = $product->getData(Wallmob_Wallmob_Model_Processor_Product::ID_ATTRIBUTE_CODE);
-            if (isset($stockUpdates[$productId])) {
-                $_product = Mage::getModel('catalog/product')->load($product->getId());
-                if ($_product) {
-                    $qty = $stockUpdates[$productId];
-                    $helper->logMessage(sprintf('Updating inventory: %s -> %s', $product->getName(), $qty));
-                    $_product->setStockData(array(
-                        'is_in_stock'  => $qty > 0,
-                        'manage_stock' => 1,
-                        'qty'          => $qty
-                    ));
-                    $_product->save();
-                }
+            if (isset($stock['product_variant_id'])) {
+                $stockUpdates[$stock['product_variant_id']] = $stock['quantity'];
+                $variantUpdates[$stock['product_variant_id']] = $stock['quantity'];
+            }
+            if (isset($stock['product_id'])) {
+                $stockUpdates[$stock['product_id']] = $stock['quantity'];
             }
         }
+
+        // Update normal product stock.
+        $this->_updateProductStock($stockUpdates);
+
+        // Update bundle stock.
+        $this->_updateBundleStock($variantUpdates);
     }
 
 }
