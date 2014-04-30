@@ -153,13 +153,29 @@ class Wallmob_Wallmob_Model_Processor_Product
     }
 
     /**
+     * Gets the variant URL key.
+     *
+     * @param string $parentName
+     * @param string $variantName
+     * @return string
+     */
+    protected function _getVariantUrlKey($parentName, $variantName)
+    {
+        $urlKey = strtolower($parentName . ' ' . $variantName);
+        $urlKey = preg_replace('/[^[:print:]]/', '', $urlKey);
+        $urlKey = str_replace('  ', ' ', $urlKey);
+        $urlKey = str_replace(' ', '-', $urlKey);
+        return $urlKey;
+    }
+
+    /**
      * Imports variants, returns their product IDs.
      *
      * @param array $variants
      * @param float $basePrice
      * @return array
      */
-    protected function _importVariants($variants, $basePrice)
+    protected function _importVariants($variants, $basePrice, $parentName)
     {
         $productIds = array();
         foreach ($variants as $variant) {
@@ -181,6 +197,11 @@ class Wallmob_Wallmob_Model_Processor_Product
                 Mage_Catalog_Model_Product_Visibility::VISIBILITY_NOT_VISIBLE,
                 $childPrice
             );
+
+            // Set a specific URL path to avoid duplicates.
+            $childProduct->setUrlKey($this->_getVariantUrlKey($parentName, $variant['product_variant_name']));
+
+            // Save the child product.
             $childProduct->save();
             $productIds[] = $childProduct->getId();
         }
@@ -364,7 +385,7 @@ class Wallmob_Wallmob_Model_Processor_Product
 
         // Create and assign variants.
         if ($productType == 'bundle') {
-            $variantProductIds = $this->_importVariants($data['product_variants'], $productPrice);
+            $variantProductIds = $this->_importVariants($data['product_variants'], $productPrice, $data['name']);
             $this->_insertVariantRelations($parentProduct, $variantProductIds);
         }
         $parentProduct->save();
