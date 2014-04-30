@@ -32,6 +32,13 @@ class Wallmob_Wallmob_Helper_Data
     protected $_isDebugMode = null;
 
     /**
+     * Cached default category attribute set id.
+     *
+     * @var int|null
+     */
+    protected $_defaultCategoryAttributeSetId = null;
+
+    /**
      * Whether or not we are running in debug mode.
      *
      * @return bool

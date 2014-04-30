@@ -23,19 +23,14 @@ $installer->startSetup();
 $currentStoreId = Mage::app()->getStore()->getId();
 Mage::app()->setCurrentStore(Mage_Core_Model_App::ADMIN_STORE_ID);
 
-// Get category entity id.
-$attributeSetId = Mage::getModel('eav/entity_type')->load('catalog_category', 'entity_type_code')
-    ->getAttributeSetCollection()
-    ->getFirstItem()
-    ->getAttributeSetId();
-
 // Create the wallmob root category.
-Mage::getModel('catalog/category')
+$category = Mage::getModel('catalog/category');
+$category
     ->setStoreId(Mage_Core_Model_App::ADMIN_STORE_ID)
     ->setName(Wallmob_Wallmob_Model_Processor_Category::ROOT_CATEGORY_NAME)
     ->setParentId(Mage_Catalog_Model_Category::TREE_ROOT_ID)
     ->setPath(Mage_Catalog_Model_Category::TREE_ROOT_ID)
-    ->setAttributeSetId($attributeSetId)
+    ->setAttributeSetId($category->getDefaultAttributeSetId())
     ->setIsActive(true)
     ->save();
 
