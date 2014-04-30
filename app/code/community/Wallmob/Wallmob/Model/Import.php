@@ -25,11 +25,23 @@ class Wallmob_Wallmob_Model_Import
     const XML_PATH_IMPORT_LAST_UPDATED = 'wallmob/import_settings/last_updated';
 
     /**
+     * ID used to lock the import process.
+     */
+    const PROCESS_ID = 'wallmob_import';
+
+    /**
      * Cached API instance.
      *
      * @var null|Wallmob_Wallmob_Model_Api
      */
     protected $_api = null;
+
+    /**
+     * Cached index process.
+     *
+     * @var null|Mage_Index_Model_Process
+     */
+    protected $_indexProcess = null;
 
     /**
      * Gets the API instance.
@@ -55,6 +67,20 @@ class Wallmob_Wallmob_Model_Import
     }
 
     /**
+     * Gets the index process.
+     *
+     * @return Mage_Index_Model_Process
+     */
+    protected function _getIndexProcess()
+    {
+        if ($this->_indexProcess === null) {
+            $this->_indexProcess = new Mage_Index_Model_Process();
+            $this->_indexProcess->setId(self::PROCESS_ID);
+        }
+        return $this->_indexProcess;
+    }
+
+    /**
      * Imports all entities.
      *
      * @return void
@@ -62,6 +88,10 @@ class Wallmob_Wallmob_Model_Import
     public function importAll()
     {
         $helper = Mage::helper('wallmob');
+        if ($this->_getIndexProcess()->isLocked()) {
+            $helper->logMessage('Import already running, skipping.');
+            return;
+        }
 
         // Grab changes for our entities.
         $entities = $this->getEntities();
@@ -82,6 +112,7 @@ class Wallmob_Wallmob_Model_Import
         $time = time();
 
         // Import data for all entities.
+        $this->_getIndexProcess()->lockAndBlock();
         if ($changes['changes_found'] !== false) {
             foreach ($entities as $type => $model) {
                 try {
@@ -93,6 +124,7 @@ class Wallmob_Wallmob_Model_Import
                     }
                 } catch (Exception $ex) {
                     $helper->logMessage(sprintf('An error occurred during the import: %s', $ex->getMessage()));
+                    $this->_getIndexProcess()->unlock();
                     return;
                 }
 
@@ -104,6 +136,7 @@ class Wallmob_Wallmob_Model_Import
         } else {
             $helper->logMessage('No changes found since last update.');
         }
+        $this->_getIndexProcess()->unlock();
     }
 
 }
