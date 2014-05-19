@@ -127,11 +127,15 @@ class Wallmob_Wallmob_Model_Import
                     $this->_getIndexProcess()->unlock();
                     return;
                 }
+                $helper->logMessage('Update succesfully finished.');
 
                 // But only update the timestamp when we had no errors.
                 $config = Mage::getConfig();
                 $config->saveConfig(self::XML_PATH_IMPORT_LAST_UPDATED, $time);
                 $config->removeCache();
+
+                // In case we're still in the same request, let's update the local cache too.
+                Mage::app()->getStore()->setConfig(self::XML_PATH_IMPORT_LAST_UPDATED, $time);
             }
         } else {
             $helper->logMessage('No changes found since last update.');
